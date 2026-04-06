@@ -6,6 +6,10 @@ macOS-Menüleisten-App zur Überwachung und Steuerung des [icloudpd](https://git
 ![macOS](https://img.shields.io/badge/macOS-13%2B-black)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## Screenshot
+
+![icloudpd Monitor](docs/Screenshot.png)
+
 ## Features
 
 | Feature | Beschreibung |
