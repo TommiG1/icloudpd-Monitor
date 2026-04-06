@@ -10,6 +10,7 @@ import time
 import re
 import subprocess
 from datetime import datetime, timezone
+from PyObjCTools import AppHelper
 
 from config import (
     SSH_HOST, SSH_PORT, SSH_USER, SSH_PASSWORD,
@@ -205,15 +206,19 @@ class ICloudPDMenubar(rumps.App):
             else:
                 self._mfa_expiry_date = None
 
-            # Update MFA UI
-            self._update_mfa_ui()
+            # Update MFA UI on main thread
+            AppHelper.callAfter(self._apply_mfa_ui)
 
         except Exception:
-            self.mfa_expiry_item.title = "🔑 MFA: Fehler beim Abruf"
-            self.mfa_days_item.title = "   Tage verbleibend: ?"
+            AppHelper.callAfter(self._apply_mfa_error)
 
-    def _update_mfa_ui(self):
-        """Update MFA-related menu items."""
+    def _apply_mfa_error(self):
+        """Set MFA error text (must be called on main thread)."""
+        self.mfa_expiry_item.title = "🔑 MFA: Fehler beim Abruf"
+        self.mfa_days_item.title = "   Tage verbleibend: ?"
+
+    def _apply_mfa_ui(self):
+        """Update MFA-related menu items (must be called on main thread)."""
         if self._mfa_expiry_date:
             expiry_display = self._mfa_expiry_date.strftime("%d.%m.%Y %H:%M")
             self.mfa_expiry_item.title = f"🔑 MFA läuft ab: {expiry_display}"
@@ -238,7 +243,10 @@ class ICloudPDMenubar(rumps.App):
     def _update_ui(self, status, text):
         self._status = status
         self._last_check = datetime.now().strftime("%H:%M:%S")
+        AppHelper.callAfter(self._apply_ui, status, text)
 
+    def _apply_ui(self, status, text):
+        """Apply UI changes (must be called on main thread)."""
         icon_map = {
             "running": ICON_RUNNING,
             "stopped": ICON_STOPPED,
@@ -351,8 +359,8 @@ class ICloudPDMenubar(rumps.App):
         # Step 2: Run re-auth in background thread
         def _do_reauth():
             self._update_ui("syncing", "Authentifizierung läuft…")
-            self.mfa_reauth_item.title = "🔐 Authentifizierung läuft…"
-            self.mfa_reauth_item.set_callback(None)
+            AppHelper.callAfter(lambda: setattr(self.mfa_reauth_item, 'title', '🔐 Authentifizierung läuft…'))
+            AppHelper.callAfter(lambda: self.mfa_reauth_item.set_callback(None))
 
             try:
                 # Use interactive SSH channel for the auth-only command
@@ -382,10 +390,13 @@ class ICloudPDMenubar(rumps.App):
                 rumps.notification("icloudpd Monitor", "Auth-Fehler", str(e)[:100])
                 self._update_ui("error", f"Auth-Fehler: {str(e)[:50]}")
             finally:
-                self.mfa_reauth_item.title = "🔐 Neu authentifizieren (MFA)…"
-                self.mfa_reauth_item.set_callback(self.on_reauth)
+                AppHelper.callAfter(self._reset_reauth_button)
 
         threading.Thread(target=_do_reauth, daemon=True).start()
+
+    def _reset_reauth_button(self):
+        self.mfa_reauth_item.title = "🔐 Neu authentifizieren (MFA)…"
+        self.mfa_reauth_item.set_callback(self.on_reauth)
 
     def _run_interactive_reauth(self, mfa_code):
         """Run icloudpd --auth-only interactively and feed MFA code."""
