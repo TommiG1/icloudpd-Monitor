@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Virtual environment
+.venv/
+
+# py2app build artifacts
+build/
+dist/
+setup_app.py
+
+# Config with credentials
+config.py
+
+# macOS
+.DS_Store
+*.swp
+
+# Logs
+*.log
+*.err
