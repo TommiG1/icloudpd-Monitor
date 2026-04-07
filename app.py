@@ -17,6 +17,7 @@ from config import (
     CONTAINER_NAME, POLL_INTERVAL, LOG_LINES,
     CONFIG_PATH, COOKIE_FILE, MFA_WARN_DAYS,
 )
+from i18n import t
 
 
 # ── Status bar icons (emoji-based) ──────────────────────────────────────
@@ -85,38 +86,38 @@ class ICloudPDMenubar(rumps.App):
         self._mfa_expiry_date = None
 
         # ── Build menu ──────────────────────────────────────────────
-        self.status_item = rumps.MenuItem("Status: prüfe...", callback=None)
+        self.status_item = rumps.MenuItem(t("status_checking"), callback=None)
         self.status_item.set_callback(None)
 
-        self.last_check_item = rumps.MenuItem("Letzte Prüfung: –", callback=None)
+        self.last_check_item = rumps.MenuItem(t("last_check_none"), callback=None)
         self.last_check_item.set_callback(None)
 
         self.separator1 = rumps.separator
 
         # ── MFA section ─────────────────────────────────────────────
-        self.mfa_expiry_item = rumps.MenuItem("🔑 MFA: prüfe...", callback=None)
+        self.mfa_expiry_item = rumps.MenuItem(t("mfa_checking"), callback=None)
         self.mfa_expiry_item.set_callback(None)
 
-        self.mfa_days_item = rumps.MenuItem("   Tage verbleibend: –", callback=None)
+        self.mfa_days_item = rumps.MenuItem(t("days_remaining_none"), callback=None)
         self.mfa_days_item.set_callback(None)
 
-        self.mfa_reauth_item = rumps.MenuItem("🔐 Neu authentifizieren (MFA)…", callback=self.on_reauth)
+        self.mfa_reauth_item = rumps.MenuItem(t("reauth_button"), callback=self.on_reauth)
 
         self.separator_mfa = rumps.separator
 
         # ── Container controls ──────────────────────────────────────
-        self.start_item = rumps.MenuItem("▶ Container starten", callback=self.on_start)
-        self.stop_item = rumps.MenuItem("⏹ Container stoppen", callback=self.on_stop)
-        self.restart_item = rumps.MenuItem("🔄 Container neustarten", callback=self.on_restart)
+        self.start_item = rumps.MenuItem(t("start_container"), callback=self.on_start)
+        self.stop_item = rumps.MenuItem(t("stop_container"), callback=self.on_stop)
+        self.restart_item = rumps.MenuItem(t("restart_container"), callback=self.on_restart)
 
         self.separator2 = rumps.separator
 
-        self.logs_item = rumps.MenuItem("📋 Logs anzeigen", callback=self.on_show_logs)
-        self.refresh_item = rumps.MenuItem("🔃 Jetzt prüfen", callback=self.on_refresh)
+        self.logs_item = rumps.MenuItem(t("show_logs"), callback=self.on_show_logs)
+        self.refresh_item = rumps.MenuItem(t("check_now"), callback=self.on_refresh)
 
         self.separator3 = rumps.separator
 
-        self.quit_item = rumps.MenuItem("Beenden", callback=self.on_quit)
+        self.quit_item = rumps.MenuItem(t("quit"), callback=self.on_quit)
 
         self.menu = [
             self.status_item,
@@ -152,7 +153,7 @@ class ICloudPDMenubar(rumps.App):
             stdout, stderr, code = self.ssh.execute(cmd)
 
             if code != 0 or not stdout.strip():
-                self._update_ui("not_found", "Container nicht gefunden")
+                self._update_ui("not_found", t("container_not_found"))
                 return
 
             parts = stdout.strip().split(" ", 1)
@@ -166,11 +167,11 @@ class ICloudPDMenubar(rumps.App):
                 last_log = log_out.strip().split("\n")[-1] if log_out.strip() else ""
 
                 short_info = last_log[:60] + "…" if len(last_log) > 60 else last_log
-                self._update_ui("running", f"Läuft – {short_info}")
+                self._update_ui("running", t("running", short_info))
             elif state == "exited":
-                self._update_ui("stopped", "Container gestoppt")
+                self._update_ui("stopped", t("container_stopped"))
             elif state == "restarting":
-                self._update_ui("syncing", "Container startet neu…")
+                self._update_ui("syncing", t("container_restarting"))
             else:
                 self._update_ui("unknown", f"Status: {state}")
 
@@ -178,7 +179,7 @@ class ICloudPDMenubar(rumps.App):
             self._check_mfa_expiry()
 
         except Exception as e:
-            self._update_ui("error", f"SSH-Fehler: {str(e)[:50]}")
+            self._update_ui("error", t("ssh_error", str(e)[:50]))
 
     def _check_mfa_expiry(self):
         """Read DAYS_REMAINING and cookie expiry date from the server."""
@@ -214,31 +215,31 @@ class ICloudPDMenubar(rumps.App):
 
     def _apply_mfa_error(self):
         """Set MFA error text (must be called on main thread)."""
-        self.mfa_expiry_item.title = "🔑 MFA: Fehler beim Abruf"
-        self.mfa_days_item.title = "   Tage verbleibend: ?"
+        self.mfa_expiry_item.title = t("mfa_fetch_error")
+        self.mfa_days_item.title = t("days_remaining_unknown")
 
     def _apply_mfa_ui(self):
         """Update MFA-related menu items (must be called on main thread)."""
         if self._mfa_expiry_date:
             expiry_display = self._mfa_expiry_date.strftime("%d.%m.%Y %H:%M")
-            self.mfa_expiry_item.title = f"🔑 MFA läuft ab: {expiry_display}"
+            self.mfa_expiry_item.title = t("mfa_expires", expiry_display)
         else:
-            self.mfa_expiry_item.title = "🔑 MFA Ablauf: unbekannt"
+            self.mfa_expiry_item.title = t("mfa_expiry_unknown")
 
         if self._days_remaining is not None:
             days = self._days_remaining
             if days <= 0:
-                self.mfa_days_item.title = f"   ⛔ ABGELAUFEN! Neu-Auth nötig!"
+                self.mfa_days_item.title = t("mfa_expired")
                 # Override status bar icon
                 self.title = ICON_MFA_WARN
             elif days <= MFA_WARN_DAYS:
-                self.mfa_days_item.title = f"   ⚠️ Noch {days} Tage verbleibend"
+                self.mfa_days_item.title = t("days_remaining_warn", days)
                 if self._status == "running":
                     self.title = ICON_MFA_WARN
             else:
-                self.mfa_days_item.title = f"   ✅ Noch {days} Tage verbleibend"
+                self.mfa_days_item.title = t("days_remaining_ok", days)
         else:
-            self.mfa_days_item.title = "   Tage verbleibend: –"
+            self.mfa_days_item.title = t("days_remaining_none")
 
     def _update_ui(self, status, text):
         self._status = status
@@ -257,7 +258,7 @@ class ICloudPDMenubar(rumps.App):
         }
         self.title = icon_map.get(status, ICON_ERROR)
         self.status_item.title = f"Status: {text}"
-        self.last_check_item.title = f"Letzte Prüfung: {self._last_check}"
+        self.last_check_item.title = t("last_check", self._last_check)
 
         # Enable/disable buttons based on state
         is_running = status == "running"
@@ -276,32 +277,32 @@ class ICloudPDMenubar(rumps.App):
                     err = stderr.strip() or stdout.strip()
                     rumps.notification(
                         "icloudpd Monitor",
-                        f"{label} fehlgeschlagen",
+                        t("action_failed", label),
                         err[:100],
                     )
                 else:
                     rumps.notification(
                         "icloudpd Monitor",
                         label,
-                        "Erfolgreich ✓",
+                        t("action_success"),
                     )
                 # Re-check immediately
                 time.sleep(2)
                 self._check_status()
             except Exception as e:
-                self._update_ui("error", f"Fehler: {str(e)[:50]}")
-                rumps.notification("icloudpd Monitor", "Fehler", str(e)[:100])
+                self._update_ui("error", t("error", str(e)[:50]))
+                rumps.notification("icloudpd Monitor", t("error", ""), str(e)[:100])
 
         threading.Thread(target=_do, daemon=True).start()
 
     def on_start(self, _):
-        self._run_docker_action("start", "Container starten")
+        self._run_docker_action("start", t("action_start"))
 
     def on_stop(self, _):
-        self._run_docker_action("stop", "Container stoppen")
+        self._run_docker_action("stop", t("action_stop"))
 
     def on_restart(self, _):
-        self._run_docker_action("restart", "Container neustarten")
+        self._run_docker_action("restart", t("action_restart"))
 
     def on_refresh(self, _):
         threading.Thread(target=self._check_status, daemon=True).start()
@@ -314,18 +315,18 @@ class ICloudPDMenubar(rumps.App):
                 stdout, stderr, code = self.ssh.execute(cmd, timeout=20)
                 log_text = stdout if stdout else stderr
                 if not log_text.strip():
-                    log_text = "(Keine Logs verfügbar)"
+                    log_text = t("no_logs")
 
                 # Write to temp file and open in TextEdit for a quick viewer
                 tmp_path = "/tmp/icloudpd_logs.txt"
-                header = f"=== icloudpd Logs (letzte {LOG_LINES} Zeilen) ===\n"
-                header += f"=== Abgerufen: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n"
+                header = t("logs_header", LOG_LINES) + "\n"
+                header += t("logs_retrieved", datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + "\n\n"
                 with open(tmp_path, "w") as f:
                     f.write(header + log_text)
                 subprocess.Popen(["open", "-a", "TextEdit", tmp_path])
 
             except Exception as e:
-                rumps.notification("icloudpd Monitor", "Log-Fehler", str(e)[:100])
+                rumps.notification("icloudpd Monitor", t("log_error"), str(e)[:100])
 
         threading.Thread(target=_fetch_and_show, daemon=True).start()
 
@@ -333,14 +334,11 @@ class ICloudPDMenubar(rumps.App):
         """Prompt for MFA code and run re-authentication."""
         # Step 1: Ask for MFA code
         window = rumps.Window(
-            message=(
-                "Gib den 6-stelligen Code von deinem Apple-Gerät ein.\n\n"
-                "Der Container wird die Session-Cookies erneuern."
-            ),
-            title="iCloud 2FA Authentifizierung",
+            message=t("reauth_message"),
+            title=t("reauth_title"),
             default_text="",
-            ok="Authentifizieren",
-            cancel="Abbrechen",
+            ok=t("reauth_ok"),
+            cancel=t("reauth_cancel"),
             dimensions=(220, 24),
         )
         response = window.run()
@@ -351,15 +349,15 @@ class ICloudPDMenubar(rumps.App):
         if not re.match(r"^\d{6}$", mfa_code):
             rumps.notification(
                 "icloudpd Monitor",
-                "Ungültiger Code",
-                "Bitte einen 6-stelligen Zahlencode eingeben.",
+                t("invalid_code"),
+                t("invalid_code_msg"),
             )
             return
 
         # Step 2: Run re-auth in background thread
         def _do_reauth():
-            self._update_ui("syncing", "Authentifizierung läuft…")
-            AppHelper.callAfter(lambda: setattr(self.mfa_reauth_item, 'title', '🔐 Authentifizierung läuft…'))
+            self._update_ui("syncing", t("auth_in_progress"))
+            AppHelper.callAfter(lambda: setattr(self.mfa_reauth_item, 'title', t("reauth_in_progress")))
             AppHelper.callAfter(lambda: self.mfa_reauth_item.set_callback(None))
 
             try:
@@ -371,8 +369,8 @@ class ICloudPDMenubar(rumps.App):
                 if result["success"]:
                     rumps.notification(
                         "icloudpd Monitor",
-                        "Authentifizierung erfolgreich ✓",
-                        "MFA-Session wurde erneuert.",
+                        t("auth_success"),
+                        t("auth_session_renewed"),
                     )
                     # Restart container to pick up new session
                     self.ssh.execute(f"docker restart {CONTAINER_NAME}", timeout=60)
@@ -380,22 +378,22 @@ class ICloudPDMenubar(rumps.App):
                 else:
                     rumps.notification(
                         "icloudpd Monitor",
-                        "Authentifizierung fehlgeschlagen",
-                        result.get("error", "Unbekannter Fehler")[:100],
+                        t("auth_failed"),
+                        result.get("error", t("auth_unknown_error"))[:100],
                     )
 
                 self._check_status()
 
             except Exception as e:
-                rumps.notification("icloudpd Monitor", "Auth-Fehler", str(e)[:100])
-                self._update_ui("error", f"Auth-Fehler: {str(e)[:50]}")
+                rumps.notification("icloudpd Monitor", t("auth_error"), str(e)[:100])
+                self._update_ui("error", t("auth_error") + f": {str(e)[:50]}")
             finally:
                 AppHelper.callAfter(self._reset_reauth_button)
 
         threading.Thread(target=_do_reauth, daemon=True).start()
 
     def _reset_reauth_button(self):
-        self.mfa_reauth_item.title = "🔐 Neu authentifizieren (MFA)…"
+        self.mfa_reauth_item.title = t("reauth_button")
         self.mfa_reauth_item.set_callback(self.on_reauth)
 
     def _run_interactive_reauth(self, mfa_code):
